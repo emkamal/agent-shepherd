@@ -43,17 +43,25 @@ tmux new -s codex2
 codex
 ```
 
-2. `agent-shepherd` scans all `codex*` sessions every 15 seconds.
+2. `codex-tmux-nudger.sh` scans all `codex*` sessions every 15 seconds.
 
 3. For each session it follows this logic:
 
-   - If `esc to interrupt` is visible → agent is **actively working**, leave it alone
-   - If a disconnect/error message is detected → mark session as **stuck** in memory
-   - If stuck AND an input prompt (`›` or `>`) is visible AND cooldown has passed → **nudge**
-   - Stuck state persists in memory even after the error message scrolls out of view
-   - Stuck state clears only when `esc to interrupt` reappears, confirming the agent resumed
+  - If `esc to interrupt` is visible -> agent is **actively working**, leave it alone
+  - If a disconnect/error message is detected -> mark session as **stuck** in memory
+  - If stuck AND an input prompt (`›` or `>`) is visible AND cooldown has passed -> **nudge**
+  - Stuck state persists in memory even after the error message scrolls out of view
+  - Stuck state clears only when `esc to interrupt` reappears, confirming the agent resumed
 
-4. The nudge is sent as two separate tmux `send-keys` calls — first `continue`, then `Enter` — because passing them together causes tmux to type the word `Enter` literally instead of pressing it.
+4. It renders a live dashboard each second showing per-session state and counters:
+
+  - `BUSY`, `IDLE`, `STUCK`, `COOLDOWN`, `NUDGED`, `ERROR`, `MISSING`
+  - Stuck detections per session
+  - Successful nudge count
+  - Remaining cooldown
+  - Cumulative active time
+
+5. The nudge is sent as two separate tmux `send-keys` calls: first `continue`, then `Enter`.
 
 ---
 
@@ -61,11 +69,11 @@ codex
 
 - Supervises multiple agent sessions simultaneously
 - Detects disconnected or stalled prompts
-- **Never interrupts an actively working agent** — busy detection via `esc to interrupt`
-- Persistent stuck state — not fooled when the error message scrolls out of view
+- **Never interrupts an actively working agent** via `esc to interrupt` detection
+- Persistent stuck state, so it is not fooled when error text scrolls out of view
 - Cooldown between nudges (default 45s) to avoid spamming
-- Verbose terminal output + log file (`~/codex-nudger.log`)
-- Pure bash + tmux — no dependencies
+- Live terminal dashboard with per-session state, counters, and active runtime
+- Pure bash + tmux, no extra dependencies
 
 ---
 
@@ -82,7 +90,7 @@ codex
 ```bash
 git clone https://github.com/YOURNAME/agent-shepherd.git
 cd agent-shepherd
-chmod +x agent-shepherd.sh
+chmod +x codex-tmux-nudger.sh
 ```
 
 ---
@@ -101,40 +109,43 @@ codex
 
 Repeat for as many agents as you want (`codex2`, `codex3`, etc.).
 
-Then run agent-shepherd in a separate terminal (outside of any tmux session):
+Then run the nudger in a separate terminal (outside of any tmux session):
 
 ```bash
-./agent-shepherd.sh
+./codex-tmux-nudger.sh
 ```
 
 You'll see live output like:
 
 ```
-Fri Mar  6 01:10:00 - Checking [codex1] (stuck_state=false)...
-  Status: 'gpt-5.3-codex high · 77% left · /path/to/repo'
-  BUSY — leaving alone.
-Fri Mar  6 01:10:00 - Checking [codex2] (stuck_state=false)...
-  Status: 'gpt-5.3-codex high · 54% left · /path/to/repo'
-  STUCK detected: 'stream disconnected before completion'
-  Prompt ready: '› continue'
-  NUDGING [codex2]...
-  Nudge sent.
-```
+Codex Nudger v12 (live dashboard)  2026-03-07 01:10:00
+CHECK_INTERVAL=15s  NUDGE_COOLDOWN=45s  LINES_TO_CHECK=20
+Active=2  Seen=2  CurrentlyStuck=1  TotalNudges=5  (Ctrl+C to stop)
 
-Logs are also written to `~/codex-nudger.log`.
+session            | state    |  stuck_seen |      nudges | cooldown | time_active
+-------------------+----------+-------------+-------------+----------+------------
+codex1             | BUSY     |           1 |           2 | -        |   00:32:14
+codex2             | COOLDOWN |           2 |           3 | 18s      |   00:29:41
+```
 
 ---
 
 ## Configuration
 
-Edit the variables at the top of `agent-shepherd.sh`:
+Edit the variables at the top of `codex-tmux-nudger.sh`:
 
 | Variable | Default | Description |
 |---|---|---|
 | `CHECK_INTERVAL` | `15` | Seconds between scans |
 | `NUDGE_COOLDOWN` | `45` | Minimum seconds between nudges per session |
 | `LINES_TO_CHECK` | `20` | Lines captured from the bottom of each pane |
-| `LOG` | `~/codex-nudger.log` | Log file path |
+
+Stuck/error detection patterns are also configurable in `STUCK_PATTERNS`:
+
+- `stream disconnected before completion`
+- `response.failed event received`
+- `Conversation interrupted`
+- `Something went wrong`
 
 ---
 
