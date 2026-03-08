@@ -48,6 +48,7 @@ codex
 3. For each session it follows this logic:
 
   - If `esc to interrupt` is visible -> agent is **actively working**, leave it alone
+  - If Codex exit output (`Token usage:` / `codex resume ...`) is visible -> mark as **EXITED**
   - If a disconnect/error message is detected -> mark session as **stuck** in memory
   - If stuck AND an input prompt (`›` or `>`) is visible AND cooldown has passed -> **nudge**
   - Stuck state persists in memory even after the error message scrolls out of view
@@ -55,7 +56,7 @@ codex
 
 4. It renders a live dashboard each second showing per-session state and counters:
 
-  - `BUSY`, `IDLE`, `STUCK`, `COOLDOWN`, `NUDGED`, `ERROR`, `MISSING`
+  - `BUSY`, `IDLE`, `STUCK`, `COOLDOWN`, `NUDGED`, `EXITED`, `ERROR`, `MISSING`
   - Stuck detections per session
   - Successful nudge count
   - Remaining cooldown

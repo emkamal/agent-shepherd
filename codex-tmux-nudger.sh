@@ -13,6 +13,11 @@ STUCK_PATTERNS=(
     "Something went wrong"
 )
 
+EXITED_PATTERNS=(
+    "Token usage:"
+    "To continue this session, run codex resume"
+)
+
 declare -A last_nudged_time
 declare -A session_stuck
 declare -A session_seen
@@ -68,6 +73,7 @@ state_color() {
         STUCK|ERROR) printf '%s' "${C_RED_BRIGHT}${C_BOLD}" ;;
         COOLDOWN) printf '%s' "${C_YELLOW_BRIGHT}${C_BOLD}" ;;
         NUDGED) printf '%s' "${C_CYAN_BRIGHT}${C_BOLD}" ;;
+        EXITED) printf '%s' "${C_DIM}" ;;
         MISSING) printf '%s' "${C_DIM}" ;;
         *) printf '' ;;
     esac
@@ -163,7 +169,7 @@ render_dashboard() {
 }
 
 scan_sessions() {
-    local session lines found_pattern prompt_line last_time elapsed remaining scan_now
+    local session lines found_pattern found_exit_pattern prompt_line last_time elapsed remaining scan_now
 
     for session in "${!session_seen[@]}"; do
         session_mode[$session]="MISSING"
@@ -189,6 +195,21 @@ scan_sessions() {
             session_stuck[$session]="false"
             session_mode[$session]="BUSY"
             session_event[$session]="busy (esc to interrupt), stuck cleared"
+            continue
+        fi
+
+        found_exit_pattern=""
+        for pattern in "${EXITED_PATTERNS[@]}"; do
+            if echo "$lines" | grep -qF "$pattern"; then
+                found_exit_pattern="$pattern"
+                break
+            fi
+        done
+
+        if [[ -n "$found_exit_pattern" ]]; then
+            session_stuck[$session]="false"
+            session_mode[$session]="EXITED"
+            session_event[$session]="codex exited: $found_exit_pattern"
             continue
         fi
 
