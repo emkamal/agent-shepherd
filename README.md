@@ -61,6 +61,7 @@ codex
   - Successful nudge count
   - Remaining cooldown
   - Cumulative active time
+  - Estimated session cost (when token usage is available on exit)
 
 5. The nudge is sent as two separate tmux `send-keys` calls: first `continue`, then `Enter`.
 
@@ -74,6 +75,7 @@ codex
 - Persistent stuck state, so it is not fooled when error text scrolls out of view
 - Cooldown between nudges (default 45s) to avoid spamming
 - Live terminal dashboard with per-session state, counters, and active runtime
+- Parses exit token usage and estimates per-session cost from `price-list.csv`
 - Pure bash + tmux, no extra dependencies
 
 ---
@@ -121,12 +123,13 @@ You'll see live output like:
 ```
 Codex Nudger v12 (live dashboard)  2026-03-07 01:10:00
 CHECK_INTERVAL=15s  NUDGE_COOLDOWN=45s  LINES_TO_CHECK=20
+COST_MODEL=gpt-5.1-codex  PRICE_LIST_FILE=price-list.csv
 Active=2  Seen=2  CurrentlyStuck=1  TotalNudges=5  (Ctrl+C to stop)
 
-session            | state    |  stuck_seen |      nudges | cooldown | time_active
--------------------+----------+-------------+-------------+----------+------------
-codex1             | BUSY     |           1 |           2 | -        |   00:32:14
-codex2             | COOLDOWN |           2 |           3 | 18s      |   00:29:41
+session            | state    |  stuck_seen |      nudges | cooldown | time_active |         cost
+-------------------+----------+-------------+-------------+----------+------------+-------------
+codex1             | BUSY     |           1 |           2 | -        |   00:32:14 |            -
+codex2             | EXITED   |           2 |           3 | -        |   00:29:41 |    $1.234567
 ```
 
 ---
@@ -140,6 +143,8 @@ Edit the variables at the top of `codex-tmux-nudger.sh`:
 | `CHECK_INTERVAL` | `15` | Seconds between scans |
 | `NUDGE_COOLDOWN` | `45` | Minimum seconds between nudges per session |
 | `LINES_TO_CHECK` | `20` | Lines captured from the bottom of each pane |
+| `PRICE_LIST_FILE` | `price-list.csv` | Pricing source CSV (USD per 1M tokens) |
+| `COST_MODEL` | `gpt-5.1-codex` | Model row used from pricing file for cost calculation |
 
 Stuck/error detection patterns are also configurable in `STUCK_PATTERNS`:
 
